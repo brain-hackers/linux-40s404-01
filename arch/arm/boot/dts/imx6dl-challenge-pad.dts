@@ -10,6 +10,7 @@
 #include <dt-bindings/clock/imx6qdl-clock.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
+#include <dt-bindings/sound/fsl-imx-audmux.h>
 
 / {
 	model = "Benesse Challenge Pad";
@@ -44,24 +45,80 @@
 		vin-supply = <&swbst_reg>;
 	};
 
+	reg_aux_5v: regulator-aux-5v {
+		compatible = "regulator-fixed";
+		regulator-name = "aux_5v";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		gpio = <&gpio6 10 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
+	reg_lcd: regulator-lcd-backlight {
+		compatible = "regulator-fixed";
+		regulator-name = "lcd";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio6 9 GPIO_ACTIVE_LOW>;
+		enable-active-low;
+	};
+
 	reg_audio: regulator-audio {
 		compatible = "regulator-fixed";
 		regulator-name = "wm8962-supply";
 		gpio = <&gpio4 10 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-always-on;
 	};
-/*
-	reg_pcie: regulator-pcie {
+
+	reg_audio_amp: regulator-audio-amp {
 		compatible = "regulator-fixed";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_pcie_reg>;
-		regulator-name = "MPCIE_3V3";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		gpio = <&gpio3 19 GPIO_ACTIVE_HIGH>;
+		regulator-name = "wm8962-supply-amp";
+		gpio = <&gpio6 7 GPIO_ACTIVE_LOW>;
+		enable-active-low;
+		regulator-always-on;
+	};
+
+	reg_audio_clock: regulator-audio-clock {
+		compatible = "regulator-fixed";
+		regulator-name = "wm8962-supply-clock";
+		gpio = <&gpio6 16 GPIO_ACTIVE_LOW>;
+		enable-active-low;
+		regulator-always-on;
+	};
+
+	reg_touch: regulator-touchscreen {
+		compatible = "regulator-fixed";
+		regulator-name = "bu21025-supply";
+		gpio = <&gpio3 24 GPIO_ACTIVE_LOW>;
+		enable-active-low;
+	};
+
+	reg_camera: regulator-sr200pc20 {
+		compatible = "regulator-fixed";
+		regulator-name = "sr200pc20-supply";
+		gpio = <&gpio6 8 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 	};
-*/
+
+	reg_wifi: regulator-sd8787 {
+		compatible = "regulator-fixed";
+		regulator-name = "sd8787-supply";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio6 15 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
+    reg_wifi_reset: regulator-sd8787-reset {
+		compatible = "regulator-fixed";
+		regulator-name = "sd8787-supply-reset";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio6 14 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 		pinctrl-names = "default";
@@ -87,35 +144,55 @@
 			wakeup-source;
 			linux,code = <KEY_VOLUMEDOWN>;
 		};
+
+		home {
+			label = "Home Button";
+			gpios = <&gpio2 4 GPIO_ACTIVE_LOW>;
+			wakeup-source;
+			linux,code = <KEY_HOME>;
+		};
 	};
 
 	sound {
-		compatible = "fsl,imx6q-sabresd-wm8962",
-			   "fsl,imx-audio-wm8962";
-		model = "wm8962-audio";
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "Wolfson WM8978";
+		simple-audio-card,format = "i2s";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_hp>;
-		ssi-controller = <&ssi2>;
-		audio-codec = <&codec>;
-		audio-asrc = <&asrc>;
-		audio-routing =
-			"Headphone Jack", "HPOUTL",
-			"Headphone Jack", "HPOUTR",
-			"Ext Spk", "SPKOUTL",
-			"Ext Spk", "SPKOUTR",
-			"AMIC", "MICBIAS",
-			"IN3R", "AMIC",
-			"DMIC", "MICBIAS",
-			"DMICDAT", "DMIC";
-		mux-int-port = <2>;
-		mux-ext-port = <3>;
-		hp-det-gpio = <&gpio7 8 GPIO_ACTIVE_LOW>;
-		mic-det-gpio = <&gpio1 9 GPIO_ACTIVE_LOW>;
+		simple-audio-card,widgets =
+            "Microphone", "MIC",
+			"Microphone", "Mic Jack",
+            "Headphone", "Headphones",
+            "Speaker", "Ext Spk";
+		simple-audio-card,routing =
+			"Headphones", "LHP",
+			"Headphones", "RHP",
+			"Ext Spk", "LSPK",
+			"Ext Spk", "RSPK",
+			"RMICN", "MIC",
+            "RMICP", "MIC",
+            "MIC", "Mic Bias",
+			"LMICN", "Mic Jack",
+            "LMICP", "Mic Jack",
+            "Mic Jack", "Mic Bias";
+		simple-audio-card,hp-det-gpio = <&gpio7 8 GPIO_ACTIVE_HIGH>;
+		simple-audio-card,mic-det-gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
+		simple-audio-card,bitclock-master = <&codec_dai>;
+		simple-audio-card,frame-master = <&codec_dai>;
+		cpu_dai: simple-audio-card,cpu {
+            sound-dai = <&ssi2>;
+        };
+        codec_dai: simple-audio-card,codec {
+            sound-dai = <&codec>;
+			clocks = <&clks IMX6QDL_CLK_CKO>;
+			system-clock-frequency=<24000000>;
+        };
 	};
 
 	backlight_lvds: backlight-lvds {
 		compatible = "pwm-backlight";
-		pwms = <&pwm1 0 5000000>;
+		pwms = <&pwm1 0 50000>;
+		power-supply = <&reg_lcd>;
 		brightness-levels = <0 4 8 16 32 64 128 255>;
 		default-brightness-level = <7>;
 		status = "okay";
@@ -125,12 +202,32 @@
 		compatible = "gpio-leds";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_gpio_leds>;
+
+		red {
+			gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+
+		flashing_off {
+			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+
+		osirase_c {
+			gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
 	};
 
 	panel {
-		compatible = "hannstar,hsd100pxn1";
-		backlight = <&backlight_lvds>;
+		compatible = "simple-panel";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gpio_panel>;
 
+		power-supply = <&reg_aux_5v>;
+		enable-gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>;
+		backlight = <&backlight_lvds>;
+	
 		port {
 			panel_in: endpoint {
 				remote-endpoint = <&lvds0_out>;
@@ -146,25 +243,21 @@
 	vsync-active = <1>;
 };
 
-&ipu1_csi0_mux_from_parallel_sensor {
-	/*remote-endpoint = <&ov5642_to_ipu1_csi0_mux>;*/
-};
-
 &ipu1_csi0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_ipu1_csi0>;
 };
 
 &mipi_csi {
-	status = "disabled";
+	status = "okay";
 
 	port@0 {
 		reg = <0>;
 
-		mipi_csi2_in: endpoint {/*
-			remote-endpoint = <&ov5640_to_mipi_csi2>;
+		mipi_csi0_in: endpoint {
+			remote-endpoint = <&sr200pc20_to_mipi_csi0>;
 			clock-lanes = <0>;
-			data-lanes = <1 2>;*/
+			data-lanes = <1 2>;
 		};
 	};
 };
@@ -173,6 +266,21 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_audmux>;
 	status = "okay";
+
+	port2 {
+        fsl,audmux-port = <1>;
+        fsl,port-config = <
+				IMX_AUDMUX_V2_PTCR_SYN			0
+                IMX_AUDMUX_V2_PTCR_TFSEL(2)		0
+                IMX_AUDMUX_V2_PTCR_TCSEL(2)		0
+                IMX_AUDMUX_V2_PTCR_TFSDIR		0
+                IMX_AUDMUX_V2_PTCR_TCLKDIR      IMX_AUDMUX_V2_PDCR_RXDSEL(2)>;
+    };
+    port3 {
+        fsl,audmux-port = <2>;
+        fsl,port-config = <
+				IMX_AUDMUX_V2_PTCR_SYN          IMX_AUDMUX_V2_PDCR_RXDSEL(1)>;
+    };
 };
 
 &clks {
@@ -191,23 +299,27 @@
 	codec: wm8978@1a {
 		compatible = "wlf,wm8978";
 		reg = <0x1a>;
-		clocks = <&clks IMX6QDL_CLK_CKO>;
-		DCVDD-supply = <&reg_audio>;
-		DBVDD-supply = <&reg_audio>;
-		AVDD-supply = <&reg_audio>;
-		CPVDD-supply = <&reg_audio>;
-		MICVDD-supply = <&reg_audio>;
-		PLLVDD-supply = <&reg_audio>;
-		SPKVDD1-supply = <&reg_audio>;
-		SPKVDD2-supply = <&reg_audio>;
-		gpio-cfg = <
-			0x0000 /* 0:Default */
-			0x0000 /* 1:Default */
-			0x0013 /* 2:FN_DMICCLK */
-			0x0000 /* 3:Default */
-			0x8014 /* 4:FN_DMICCDAT */
-			0x0000 /* 5:Default */
-		>;
+		#sound-dai-cells = <0>;
+	};
+
+	sr200pc20: camera@20 {
+		compatible = "siliconfile,sr200pc20";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sr200pc20>;
+		reg = <0x20>;
+		clocks = <&clks IMX6QDL_CLK_OSC>;
+		clock-names = "osc_clk";
+		power-supply = <&reg_camera>;
+		powerdown-gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
+
+		port {
+			sr200pc20_to_mipi_csi0: endpoint {
+				remote-endpoint = <&mipi_csi0_in>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+			};
+		};
 	};
 
 	accelerometer@1c {
@@ -219,7 +331,7 @@
 		interrupts = <18 IRQ_TYPE_LEVEL_LOW>;
 	};
 
-fuelgauge: max17048@36 {
+	fuelgauge: max17048@36 {
 		compatible = "maxim,max17048";
 		reg = <0x36>;
 
@@ -342,31 +454,47 @@ fuelgauge: max17048@36 {
 			};
 		};
 	};
+
+	bu21013_tp@48 {
+		compatible = "rohm,bu21025gul";
+		reg = <0x48>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_i2c2_bu21025_int>;
+		interrupt-parent = <&gpio7>;
+		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
+		irq-gpio = <&gpio7 1 0>;
+		power-supply = <&reg_touch>;
+	};
 };
 
 &iomuxc {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_hog>;
 
-	imx6qdl-sabresd {
-		
-		pinctrl_hog: hoggrp {
-			fsl,pins = </*
-				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x1b0b0
-				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x1b0b0
-				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x1b0b0
-				MX6QDL_PAD_NANDF_D3__GPIO2_IO03 0x1b0b0
-				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x130b0
-				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x1b0b0
-				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x1b0b0
-				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x1b0b0
-				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x1b0b0
-			*/
-			MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09 0x1b0b0>;
+	imx6dl-challenge-pad {
+
+		pinctrl_gpio_panel: gpio_panelgrp {
+			fsl,pins = <
+				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30	0x1b0b0 /* LCD_POWER_EN */
+				MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09	0x1b0b0 /* LCD_BACKLIGHT_POWER_EN */
+				MX6QDL_PAD_NANDF_RB0__GPIO6_IO10	0x1b0b0 /* AUX_5V_ENABLE */
+			>;
+		};
+
+		pinctrl_sr200pc20: gpio_sr200pc20 {
+			fsl,pins = <
+				MX6QDL_PAD_SD1_DAT0__GPIO1_IO16		0x1b0b0
+				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17		0x1b0b0
+				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x1b0b0
+			>;
 		};
 
 		pinctrl_audmux: audmuxgrp {
 			fsl,pins = <
+				MX6QDL_PAD_KEY_COL2__GPIO4_IO10		0x1b0b0
+				MX6QDL_PAD_NANDF_CS3__GPIO6_IO16	0x1b0b0
+				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07	0x1b0b0
+				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x1b0b0
+
 				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
 				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
 				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
@@ -374,20 +502,12 @@ fuelgauge: max17048@36 {
 			>;
 		};
 
-		pinctrl_ecspi1: ecspi1grp {
-			fsl,pins = <
-				MX6QDL_PAD_KEY_COL1__AUD5_TXFS	0x100b1
-				MX6QDL_PAD_KEY_ROW0__AUD5_TXD	0x100b1
-				MX6QDL_PAD_KEY_COL0__AUD5_TXC	0x100b1
-				MX6QDL_PAD_KEY_ROW1__AUD5_RXD	0x1b0b0
-			>;
-		};
-
 		pinctrl_gpio_keys: gpio_keysgrp {
 			fsl,pins = <
-				MX6QDL_PAD_EIM_D25__GPIO3_IO25 0x1b0b0
-				MX6QDL_PAD_GPIO_4__GPIO1_IO04  0x1b0b0
-				MX6QDL_PAD_GPIO_5__GPIO1_IO05  0x1b0b0
+				MX6QDL_PAD_EIM_D25__GPIO3_IO25  	0x1b0b0 /* Power */
+				MX6QDL_PAD_GPIO_4__GPIO1_IO04   	0x1b0b0 /* Vol Up */
+				MX6QDL_PAD_GPIO_5__GPIO1_IO05		0x1b0b0 /* Vol Down */
+				MX6QDL_PAD_NANDF_D4__GPIO2_IO04		0x1b0b0 /* Home */
 			>;
 		};
 
@@ -424,15 +544,10 @@ fuelgauge: max17048@36 {
 			>;
 		};
 
-		pinctrl_i2c2_egalax_int: i2c2egalaxintgrp {
+		pinctrl_i2c2_bu21025_int: i2c2bu21025intgrp {
 			fsl,pins = <
-				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x1b0b0
-			>;
-		};
-
-		pinctrl_i2c3_isl29023_int: i2c3isl29023intgrp {
-			fsl,pins = <
-				MX6QDL_PAD_EIM_DA9__GPIO3_IO09		0x1b0b0
+				MX6QDL_PAD_EIM_D24__GPIO3_IO24	0x1b0b0
+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01 0xb0b1
 			>;
 		};
 
@@ -452,21 +567,9 @@ fuelgauge: max17048@36 {
 			>;
 		};
 
-		pinctrl_pcie: pciegrp {
-			fsl,pins = <
-				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
-			>;
-		};
-
-		pinctrl_pcie_reg: pciereggrp {
-			fsl,pins = <
-				MX6QDL_PAD_EIM_D19__GPIO3_IO19	0x1b0b0
-			>;
-		};
-
 		pinctrl_pwm1: pwm1grp {
 			fsl,pins = <
-				MX6QDL_PAD_SD1_DAT3__PWM1_OUT		0x1b0b1
+				MX6QDL_PAD_SD1_DAT3__PWM1_OUT		0x17059
 			>;
 		};
 
@@ -474,6 +577,24 @@ fuelgauge: max17048@36 {
 			fsl,pins = <
 				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
 				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
+			>;
+		};
+
+		pinctrl_uart2: uart2grp {
+			fsl,pins = <
+				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
+				MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
+				MX6QDL_PAD_EIM_D28__UART2_CTS_B		0x1b0b1
+				MX6QDL_PAD_EIM_D29__UART2_RTS_B		0x1b0b1
+			>;
+		};
+
+		pinctrl_bluetooth: bluetoothgrp {
+			fsl,pins = <
+				MX6QDL_PAD_KEY_COL1__AUD5_TXFS	0x100b1
+				MX6QDL_PAD_KEY_ROW0__AUD5_TXD	0x100b1
+				MX6QDL_PAD_KEY_COL0__AUD5_TXC	0x100b1
+				MX6QDL_PAD_KEY_ROW1__AUD5_RXD	0x1b0b0
 			>;
 		};
 
@@ -491,6 +612,11 @@ fuelgauge: max17048@36 {
 				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
 				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
+
+				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
+				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11	0x1b0b0
+				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14	0x1b0b0
+				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15	0x1b0b0
 			>;
 		};
 
@@ -530,7 +656,9 @@ fuelgauge: max17048@36 {
 	gpio_leds {
 		pinctrl_gpio_leds: gpioledsgrp {
 			fsl,pins = <
-				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x1b0b0
+				MX6QDL_PAD_GPIO_2__GPIO1_IO02   0x1b0b0 /* USR_DEF_RED_LED */
+				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x1b0b0 /* Flashing_off */
+				MX6QDL_PAD_NANDF_D3__GPIO2_IO03 0x1b0b0 /* osirase_c */
 			>;
 		};
 	};
@@ -541,16 +669,29 @@ fuelgauge: max17048@36 {
 
 	lvds-channel@1 {
 		fsl,data-mapping = "spwg";
-		fsl,data-width = <18>;
+		fsl,data-width = <24>;
 		status = "okay";
 
-		port@4 {
-			reg = <4>;
+		port@0 {
+			reg = <0>;
 
 			lvds0_out: endpoint {
 				remote-endpoint = <&panel_in>;
 			};
 		};
+		display-timings {
+	        timing0 {
+        	    clock-frequency = <15385000>;
+            	hactive = <1024>;
+	            vactive = <768>;
+    	        hsync-len = <70>;
+        	    hfront-porch = <160>;
+            	hback-porch = <160>;
+	            vfront-porch = <15>;
+    	        vback-porch = <23>;
+        	    vsync-len = <10>;
+	        };
+    	};
 	};
 };
 
@@ -590,6 +731,7 @@ fuelgauge: max17048@36 {
 };
 
 &ssi2 {
+	fsl,mode = "i2s-master";
 	status = "okay";
 };
 
@@ -599,9 +741,16 @@ fuelgauge: max17048@36 {
 	status = "okay";
 };
 
+&uart2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart2>;
+	status = "okay";
+};
+
 &usbh1 {
 	vbus-supply = <&reg_usb_h1_vbus>;
-	status = "disabled";
+	dr_mode = "otg";
+	status = "okay";
 };
 
 &usbotg {
@@ -616,8 +765,26 @@ fuelgauge: max17048@36 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_usdhc2>;
 	bus-width = <4>;
-	non-removable;
+	cap-power-off-card;
+	keep-power-in-suspend;
+	vmmc-supply = <&reg_wifi>;
+	vqmmc-supply = <&reg_wifi_reset>;
 	status = "okay";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	mwifiex: wifi@1 {
+		compatible = "marvell,sd8787", "marvell,sd8897";
+		reg = <0x1>;
+		status = "okay";
+	};
+
+/*	btmrvl: bluetooth@2 {
+		compatible = "marvell,sd8897-bt";
+		reg = <0x2>;
+		status = "okay";
+	};*/
 };
 
 &usdhc3 {
